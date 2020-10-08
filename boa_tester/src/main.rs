@@ -42,7 +42,7 @@ mod results;
 
 use self::{
     read::{read_global_suite, read_harness, MetaData, Negative, TestFlag},
-    results::write_json,
+    results::{compare, write_json, print_comparison},
 };
 use bitflags::bitflags;
 use fxhash::FxHashMap;
@@ -61,9 +61,18 @@ static CLI: Lazy<Cli> = Lazy::new(Cli::from_args);
 #[derive(StructOpt, Debug)]
 #[structopt(name = "Boa test262 tester")]
 struct Cli {
-    // Whether to show verbose output.
+    /// Whether to show verbose output.
     #[structopt(short, long)]
     verbose: bool,
+
+    /// Whether to display the output in markdown (useful to create GitHub comments).
+    ///
+    /// Note: this output will be written in an `out.md` file.
+    #[structopt(short = "md", long)]
+    markdown: bool,
+
+    /// An optional JSON Test262 result to compare these results with.
+    compare: Option<PathBuf>,
 
     /// Path to the Test262 suite.
     #[structopt(long, parse(from_os_str), default_value = "./test262")]
@@ -75,9 +84,21 @@ struct Cli {
 }
 
 impl Cli {
-    // Whether to show verbose output.
+    /// Whether to show verbose output.
     fn verbose(&self) -> bool {
         self.verbose
+    }
+
+    /// Whether to display the output in markdown (useful to create GitHub comments).
+    ///
+    /// Note: this output will be written in an `out.md` file.
+    fn markdown(&self) -> bool {
+        self.markdown
+    }
+
+    /// An optional JSON Test262 result to compare these results with.
+    fn compare(&self) -> Option<&Path> {
+        self.compare.as_deref()
     }
 
     /// Path to the Test262 suite.
@@ -125,6 +146,10 @@ fn main() {
         (results.passed as f64 / results.total as f64) * 100.0
     );
 
+    if let Some(comparison) = compare(&results).expect("could not compare the results with previous results") {
+        print_comparison(comparison).expect("could not write the comparison");
+    }
+
     write_json(results).expect("could not write the results to the output JSON file");
 }
 
@@ -151,10 +176,12 @@ struct SuiteResult {
     name: Box<str>,
     #[serde(rename = "c")]
     total: usize,
-    #[serde(rename = "p")]
+    #[serde(rename = "o")]
     passed: usize,
     #[serde(rename = "i")]
     ignored: usize,
+    #[serde(rename = "p")]
+    panic: usize,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(rename = "s")]
     suites: Vec<SuiteResult>,
@@ -168,6 +195,8 @@ struct SuiteResult {
 struct TestResult {
     #[serde(rename = "n")]
     name: Box<str>,
+    #[serde(skip)]
+    result_text: Box<str>,
     #[serde(rename = "r")]
     result: TestOutcomeResult,
 }
