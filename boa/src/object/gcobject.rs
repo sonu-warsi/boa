@@ -25,11 +25,11 @@ use std::{
     result::Result as StdResult,
 };
 
-/// A wrapper type for an immutably borrowed `Object`.
-pub type Ref<'object, T> = GcCellRef<'object, T>;
+/// A wrapper type for an immutably borrowed type T.
+pub type Ref<'a, T> = GcCellRef<'a, T>;
 
-/// A wrapper type for a mutably borrowed `Object`.
-pub type RefMut<'object, T> = GcCellRefMut<'object, T>;
+/// A wrapper type for a mutably borrowed type T.
+pub type RefMut<'a, T> = GcCellRefMut<'a, T>;
 
 /// Garbage collected `Object`.
 #[derive(Trace, Finalize, Clone, Default)]
